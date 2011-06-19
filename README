@@ -1,1 +1,5 @@
-A drupal module that enables to mark fields to be limited using the textsizelimiter object. Not yet completed.
+# Introduction
+A drupal module that enables to mark fields to be limited using the textsizelimiter object. This module requires the TextSizeLimiter.php in the same direcotry as the module self. The module is in alpha mode at the moment.
+
+# Usage
+In admin/settings/textfield_limiter it is possible to add the fields to be limited.

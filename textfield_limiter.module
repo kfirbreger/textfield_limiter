@@ -7,7 +7,8 @@ function textfield_limiter_menu() {
 	
 	$menu['admin/settings/textfield_limiter'] = array(
 		'title' => 'Text Field Limiter Settings',
-		'page argumentss' => array('textfield_limiter_settings_form'),
+		'description' => 'Setting up text shorteners',
+		'page arguments' => array('textfield_limiter_settings_form'),
 		'page callback' => 'drupal_get_form',
 		'access arguments' => array('administer site content'),
 		'type' => MENU_NORMAL_ITEM,
@@ -23,16 +24,24 @@ function textfield_limiter_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
 	// Alter node before save
 	if ($op == 'presave') {
 		$res = db_query("SELECT field_name, size_limit FROM textfield_limiter WHERE node_type like '%s'", $node->type);
-		if (db_num_result($res) == 0) {
+		if (db_affected_rows($res) == 0) {
 			// No field needs to be limit
 			return;
 		}
 		require('TextSizeLimiter.php');
 		$limiter = new TextSizeLimiter();
+		dsm($node);
 		while ($limit_set = db_fetch_object($res)) {
-			$limiter->setLimit($limit_set->size_limit);
-			$limiter->load($node->content[$limit_set->field_name]['#value']);
-			$node->content[$limit_set->field_name]['#value'] = $limiter->run();
+			dsm($limit_set);
+			$field_name = $limit_set->field_name;
+			$field = $node->$field_name;
+			dsm($field[0]['value']);
+			$limiter->setLimit(intval($limit_set->size_limit));
+			$limiter->load($field[0]['value']);
+			$r = $limiter->run();
+			dsm($r);
+			$field[0]['value'] = $r;
+			$node->$field_name = $field;
 		}
 	}
 }
@@ -43,17 +52,19 @@ function textfield_limiter_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
 function textfield_limiter_settings_form() {
 	$form = array();
 	// Retrieving all previous limiters
-	$res = db_query("SELECT tlid, node_type, field_name, size_limiter FROM textfield_limiter");
+	$res = db_query("SELECT tlid, node_type, field_name, size_limit FROM textfield_limiter");
 	$form['limiters'] = array(
 		'#type' => 'fieldset',
 		'#title' => t('Set limiters'),
-		'#collapsible' => TRUE,
-		'#collapsed' => TRUE,
+		'#tree' => TRUE,
 	);
 	while ($limiter = db_fetch_object($res)) {
 		$form['limiters'][$limiter->tlid] = array(
 			'#type' => 'fieldset',
-			'#title' => $limiter->node_type,
+			'#tree' => TRUE,
+		);
+		$form['limiters'][$limiter->tlid]['node_type'] = array(
+			'#value' => $limiter->node_type,
 		);
 		$form['limiters'][$limiter->tlid]['field_name'] = array(
 			'#type' => 'textfield', // @TODO make a select box with valid text fields of the node
@@ -61,15 +72,14 @@ function textfield_limiter_settings_form() {
 			'#size' => 32,
 			'#max_size' => 128,
 		);
-		$form['limiters'][$limiter->tlid]['field_name'] = array(
+		$form['limiters'][$limiter->tlid]['size_limit'] = array(
 			'#type' => 'textfield', // @TODO make a select box with valid text fields of the node
-			'#default_value' => $limiter->size_limiter,
+			'#default_value' => $limiter->size_limit,
 			'#size' => 4,
 			'#max_size' => 4,
 		);
 		$form['limiters'][$limiters->tlid]['delete'] = array(
 			'#type' => 'checkbox',
-			'#title' => t('Delete'),
 		);
 	}
 	$form['limiters']['Update'] = array(
@@ -81,20 +91,20 @@ function textfield_limiter_settings_form() {
 		'#title' => 'Add a limiter',
 		'#collapsible' => TRUE,
 		'#collapsed' => FALSE,
+		'#tree' => TRUE,
 	);
 	$form['add_limiter']['type'] = array(
-		'#type' => 'textfield',
-		'#title' => t('Node Type'), // @TODO make a select box with node types
-		'#size' => 12,
-		'#max_size' => 32,
+		'#type' => 'select',
+		'#title' => t('Node Type'),
+		'#options' => array_map('check_plain', node_get_types('names')),
 	);
 	$form['add_limiter']['field'] = array(
 		'#type' => 'textfield',
-		'#title' => t('Field name'), // @TODO make a select box with possible fields
+		'#title' => t('Field name'), // @TODO make a select box with possible fields retrieve via ajax
 		'#size' => 12,
 		'#max_size' => 32,
 	);
-	$form['add_limiter']['type'] = array(
+	$form['add_limiter']['limit'] = array(
 		'#type' => 'textfield',
 		'#title' => t('Limit'), 
 		'#size' => 4,
@@ -112,5 +122,50 @@ function textfield_limiter_settings_form() {
  * Settings form submittion
  */
 function textfield_limiter_settings_form_submit($form, $form_state) {
-	
+	// Chcking if this is an update or an addition
+	if ($form_state['clicked_button']['#value'] == t('Add')) {
+		db_query("INSERT INTO textfield_limiter (node_type, field_name, size_limit)
+																VALUES ('%s', '%s', %d)", $form_state['values']['add_limiter']['type'], $form_state['values']['add_limiter']['field'], $form_state['values']['add_limiter']['limit']);
+	}
+	dsm($form);
+	dsm($form_state);
+}
+
+/**
+ * Implementation of hook_theme
+ */
+function textfield_limiter_theme() {
+	return array(
+		'textfield_limiter_settings_form' => array('arguments' => array('form' => NULL),),
+	);
+}
+
+/**
+ * Creating the theme function
+ */
+function theme_textfield_limiter_settings_form($form) {
+	$rows = array();
+	foreach (element_children($form['limiters']) as $key) {
+			$row = array();
+			$row[] = array('data' => drupal_render($form['limiters'][$key]['node_type']));
+			$row[] = array('data' => drupal_render($form['limiters'][$key]['field_name']),
+											'class' => 'textfield');
+			$row[] = array('data' => drupal_render($form['limiters'][$key]['size_limit']),
+											'class' => 'textfield');
+			$row[] = array('data' => drupal_render($form['limiters'][$key]['delete']),
+											'class' => 'checkbox');
+			$rows[] = $row;
+		}
+
+		// Individual table headers.
+		$header = array();
+		$header[] = t('Type');
+		$header[] = array('data' => t('Field Name'), 'class' => 'textfield');
+		$header[] = array('data' => t('Size Limit'), 'class' => 'textfield');
+		$header[] = array('date' => t('Delete'), 'class' => 'checkbox');
+		//$output = drupal_render($form['limiters']);
+		$output = theme('table', $header, $rows);
+		$output .= drupal_render($form['limiters']['Update']);
+		$output .= drupal_render($form);
+		return $output;
 }
