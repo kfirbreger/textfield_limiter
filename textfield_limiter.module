@@ -1,0 +1,116 @@
+<?php
+/**
+ * Implementation of hook_menu()
+ */
+function textfield_limiter_menu() {
+	$menu = array();
+	
+	$menu['admin/settings/textfield_limiter'] = array(
+		'title' => 'Text Field Limiter Settings',
+		'page argumentss' => array('textfield_limiter_settings_form'),
+		'page callback' => 'drupal_get_form',
+		'access arguments' => array('administer site content'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	
+	return $menu;
+}
+
+/**
+ * Implementation of hook_nodeapi()
+ */
+function textfield_limiter_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+	// Alter node before save
+	if ($op == 'presave') {
+		$res = db_query("SELECT field_name, size_limit FROM textfield_limiter WHERE node_type like '%s'", $node->type);
+		if (db_num_result($res) == 0) {
+			// No field needs to be limit
+			return;
+		}
+		require('TextSizeLimiter.php');
+		$limiter = new TextSizeLimiter();
+		while ($limit_set = db_fetch_object($res)) {
+			$limiter->setLimit($limit_set->size_limit);
+			$limiter->load($node->content[$limit_set->field_name]['#value']);
+			$node->content[$limit_set->field_name]['#value'] = $limiter->run();
+		}
+	}
+}
+
+/**
+ * Implementation of settings menu
+ */
+function textfield_limiter_settings_form() {
+	$form = array();
+	// Retrieving all previous limiters
+	$res = db_query("SELECT tlid, node_type, field_name, size_limiter FROM textfield_limiter");
+	$form['limiters'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('Set limiters'),
+		'#collapsible' => TRUE,
+		'#collapsed' => TRUE,
+	);
+	while ($limiter = db_fetch_object($res)) {
+		$form['limiters'][$limiter->tlid] = array(
+			'#type' => 'fieldset',
+			'#title' => $limiter->node_type,
+		);
+		$form['limiters'][$limiter->tlid]['field_name'] = array(
+			'#type' => 'textfield', // @TODO make a select box with valid text fields of the node
+			'#default_value' => $limiter->field_name,
+			'#size' => 32,
+			'#max_size' => 128,
+		);
+		$form['limiters'][$limiter->tlid]['field_name'] = array(
+			'#type' => 'textfield', // @TODO make a select box with valid text fields of the node
+			'#default_value' => $limiter->size_limiter,
+			'#size' => 4,
+			'#max_size' => 4,
+		);
+		$form['limiters'][$limiters->tlid]['delete'] = array(
+			'#type' => 'checkbox',
+			'#title' => t('Delete'),
+		);
+	}
+	$form['limiters']['Update'] = array(
+		'#type' => 'submit',
+		'#value' => t('Update'),
+	);
+	$form['add_limiter'] = array(
+		'#type' => 'fieldset',
+		'#title' => 'Add a limiter',
+		'#collapsible' => TRUE,
+		'#collapsed' => FALSE,
+	);
+	$form['add_limiter']['type'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Node Type'), // @TODO make a select box with node types
+		'#size' => 12,
+		'#max_size' => 32,
+	);
+	$form['add_limiter']['field'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Field name'), // @TODO make a select box with possible fields
+		'#size' => 12,
+		'#max_size' => 32,
+	);
+	$form['add_limiter']['type'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Limit'), 
+		'#size' => 4,
+		'#max_size' => 4,
+	);
+	$form['add_limiter']['submit'] = array(
+		'#type' => 'submit',
+		'#value' => t('Add'),
+	);
+	
+	return $form;
+}
+
+/**
+ * Settings form submittion
+ */
+function textfield_limiter_settings_form_submit($form, $form_state) {
+	
+}

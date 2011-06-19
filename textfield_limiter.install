@@ -1,0 +1,57 @@
+<?php
+
+/**
+ * Implementatio of hook_install
+ */
+function textfield_limiter_install() {
+	drupal_install_schema('textfield_limiter');
+}
+
+/**
+ * Implementation of hook uninstall
+ */
+function textfield_limiter_uninstall() {
+	drupal_uninstall_schema('textfield_limiter');
+}
+
+/**
+ * Implementation of hook_schema
+ */
+function textfield_limiter_schema() {
+	$schema = array();
+	
+	$schema['textfield_limiter'] = array(
+		'description' => 'The fields associated with the limiter',
+		'fields' => array(
+			'tlid' => array(
+				'description' => 'Primary key for the table',
+				'type' => 'serial',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+			),
+			'node_type' => array(
+				'description' => 'The node_type of this node.', 
+				'type' => 'varchar', 
+				'length' => 32, 
+				'not null' => TRUE, 
+			),
+			'field_name' => array(
+				'description' => 'The name of the field to be limited',
+				'type' => 'varchar',
+				'length' => 128,
+				'not null' => TRUE,
+			),
+			'size_limit' => array(
+				'description' => 'The size limit of visible characters',
+				'type' => 'int',
+				'not null' => TRUE,
+			),
+		),
+		'unique keys' => array(
+			'type_field' => array('node_type', 'field_name'),
+		),
+		'primary key' => array('tlid'),
+	);
+	
+	return $schema;
+}

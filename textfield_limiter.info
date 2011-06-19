@@ -1,0 +1,5 @@
+name = Text Field Limiter
+description = Limits the size of a text field based on visible characters.
+dependencies[] = cck
+core = 6.x
+version = 0.1
