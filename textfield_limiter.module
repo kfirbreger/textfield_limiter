@@ -28,13 +28,9 @@ function textfield_limiter_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
 			// No field needs to be limit
 			return;
 		}
-<<<<<<< HEAD
-		require_once('TextSizeLimiter.php');
-=======
 		if (!class_exists('TextSizeLimiter')) {
 		  require('TextSizeLimiter.php');
 		}
->>>>>>> Added a check to see if the class exists before requiring file
 		$limiter = new TextSizeLimiter();
 		while ($limit_set = db_fetch_object($res)) {
 			$field_name = $limit_set->field_name;
