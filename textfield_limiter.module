@@ -66,10 +66,7 @@ function textfield_limiter_settings_form() {
 			'#value' => $limiter->node_type,
 		);
 		$form['limiters']['items'][$limiter->tlid]['field_name'] = array(
-			'#type' => 'textfield', // @TODO make a select box with valid text fields of the node
-			'#default_value' => $limiter->field_name,
-			'#size' => 32,
-			'#max_size' => 128,
+			'#value' => $limiter->field_name,
 		);
 		$form['limiters']['items'][$limiter->tlid]['size_limit'] = array(
 			'#type' => 'textfield', // @TODO make a select box with valid text fields of the node
@@ -118,14 +115,47 @@ function textfield_limiter_settings_form() {
 }
 
 /**
+ * Settings form validation
+ */
+function textfield_limiter_settings_form_validate($form, $form_state) {
+  // checking for adding
+  if ($form_state['clicked_button']['#value'] == t('Add')) {
+    if (!is_numeric($form_state['values']['add_limiter']['limit'])) {
+      form_set_error('limit', t('Limit should be an integer'));
+    }
+    // @TODO check that field exists
+  } else if ($form_state['clicked_button']['#value'] == t('Update')) {
+    foreach($form_state['values']['limiters']['items'] as $tlid => $limit) {
+	    if (!is_numeric($limit['size_limit'])) {
+        form_set_error('size_limit', t('Limit should be an integer'));
+        break;
+      }
+	  }
+  }
+}
+
+/**
  * Settings form submittion
  */
 function textfield_limiter_settings_form_submit($form, $form_state) {
 	// Chcking if this is an update or an addition
 	if ($form_state['clicked_button']['#value'] == t('Add')) {
-		db_query("INSERT INTO textfield_limiter (node_type, field_name, size_limit)
+	  // Adding a new entry
+		db_query("INSERT INTO {textfield_limiter} (node_type, field_name, size_limit)
 																VALUES ('%s', '%s', %d)", $form_state['values']['add_limiter']['type'], $form_state['values']['add_limiter']['field'], $form_state['values']['add_limiter']['limit']);
-	}
+	} else if ($form_state['clicked_button']['#value'] == t('Update')) {
+	  // Updating data or deleting if needed
+	  foreach($form_state['values']['limiters']['items'] as $tlid => $limit) {
+	    // checking for delete
+	    if ($limit['delete-' . $tlid] == 1) {
+	      db_query("DELETE FROM {textfield_limiter} WHERE tlid=%d", $tlid);
+	    } else {
+	      // Not a delete, update the value
+	      $limit['size_limit'] = intval($limit['size_limit']);
+	      db_query("UPDATE {textfield_limiter} SET size_limit=%d WHERE tlid=%d", $limit['size_limit'], $tlid);
+	    }
+	  }
+	} 
 }
 
 /**
