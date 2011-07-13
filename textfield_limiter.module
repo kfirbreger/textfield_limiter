@@ -36,7 +36,11 @@ function textfield_limiter_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
 			$field_name = $limit_set->field_name;
 			$field = $node->$field_name;
 			$limiter->setLimit(intval($limit_set->size_limit));
-			$limiter->load($field[0]['value']);
+			$str_value = $field[0]['value'];
+			if (variable_get('textfield_limiter_trim', TRUE)) {
+			  $str_value = trim($str_value);
+			}
+			$limiter->load($str_value);
 			$field[0]['value'] = $limiter->run();
 			$node->$field_name = $field;
 		}
